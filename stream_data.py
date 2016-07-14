@@ -16,23 +16,21 @@ meant to be implemented by a multiprocessing Process
 -data_flag: a mp.Event object that signals when new data is present
 -array: a mp.Array memory-mapped array containing the data
 --array_dtype: the data type that you will be saving
---lock: a threading.Lock object to control access to the Array and Event objects
---fileroot: the address to create or open the data file (str)
--channel: the channel number (will be used to name the dataset)
+--filename: the address to create or open the data file (str)
 """
 def file_stream(start_flag, data_flag, shared_array, 
-	dtype, fileroot, channel):
+	array_dtype, filename):
 	##open an hdf5 file
-	f_out = h5py.File(fileroot, 'a')
+	f_out = h5py.File(filename, 'a')
 	##get the size of the mem-mapped array
 	array_len = len(array)
 	##create a dataset of size 0 that can be resized.
 	##setting chunk size to numPoints should speed up 
 	##operations (??)
 	try:
-		dset = f_out.create_dataset(channel, (0,), dtype = "float32", 
+		dset = f_out.create_dataset("data", (0,), dtype = "array_dtype", 
 									chunks = (array_len,), maxshape = (None,))
-	except RuntimeError:
+	except RuntimeError: 
 		print "A dataset for " + channel + " already exists!"
 		break
 	##counter for the number of writes to file
@@ -54,10 +52,24 @@ def file_stream(start_flag, data_flag, shared_array,
 
 """
 The MIMO version of the above file. 
+
+-start_flag is a mem-mapped flag object
+-fileroot: a string to use as the file path/name
+-dtype:
 """
-def batch_stream(start_flag, fileroot, dtype, 
-	channel_names, data_flags, arrays):
-	pass
+def batch_stream(start_flag, data_flags, arrays, array_dtype, filenames):
+	##how many channels are we working with, 
+	##and make sure numbers match
+	num_chans = len(arrays)
+	if num_chans != len(filenames) or num_chans != len(data_flags):
+		raise ValueError("Mismatched channel names/flags/numbers")
+	##create a worker pool to handle the data saving
+	pool = mp.Pool(num_chans)
+	for i in range(num_chans):
+		pool.apply_async(file_stream, args = (start_flag, data_flags[i], arrays[i],
+			array_dtype, filenames[i]))
+	
+
 
 
 
