@@ -54,8 +54,9 @@ def file_stream(start_flag, data_flag, shared_array,
 The MIMO version of the above file. 
 
 -start_flag is a mem-mapped flag object
--fileroot: a string to use as the file path/name
--dtype:
+-data_flags: list of mp flags for each array object
+-array_dtype: data type to save data as 
+-filenames: list of filenames to save data as
 """
 def batch_stream(start_flag, data_flags, arrays, array_dtype, filenames):
 	##how many channels are we working with, 
