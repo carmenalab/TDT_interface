@@ -8,6 +8,9 @@
 import h5py
 import multiprocessing as mp
 
+
+##DUMB: class objects will not pickle! Need to re-do this whole thing.
+
 """
 a class that sets up a set of memory-mapped objects that can be shared
 across processes for streaming data to a file
