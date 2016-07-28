@@ -55,11 +55,15 @@ class RZ2:
 	def start(self):
 		if self.dsp.Run() == 0:
 			raise SystemError, "Cannot start device"
+		else:
+			self.is_running = True
 
 	#to stop the circuit
 	def stop(self):
 		if self.dsp.Halt() == 0:
 			raise SystemError, "Cannot stop device"
+		else:
+			self.is_running = False
 
 	# to get the sampling frequency 
 	def get_fs(self):
@@ -74,6 +78,8 @@ class RZ2:
 		result = self.dsp.GetStatus()
 		if result == 7:
 			self.is_running = True
+		else:
+			self.is_running = False
 		return result
 
 	##to set parameter tag values. Requires string tag_name and 
