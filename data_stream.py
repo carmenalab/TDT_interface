@@ -42,7 +42,7 @@ chans is a LIST of channels (int)
 """
 	result = {}
 	for n in chans:
-		result "channel_"+str(n+1) = mp.Queue()
+		result[n] = mp.Queue()
 	return result
 
 
@@ -64,6 +64,12 @@ def TDT_stream(TDT_obj, chans, save_folder):
 	queue_dict = queue_creator(chans)
 	##spawn processes to stream the data
 	pool = mp.Pool(len(chans))
+	##generate a list of argument lists
+	arg_lists = []
+	for chan in chans:
+		arg_lists.append([queue_dict[chan], save_folder+"/"+chan+".hdf5", ])
+	pool.apply_async(stream_to_file, )
+
 	
 
 
