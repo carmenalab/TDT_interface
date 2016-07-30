@@ -2,7 +2,6 @@
 import h5py
 import multiprocessing as mp
 
-def stream_to_file(queue, fname, tag, dtype, chunk):
 """
 function that watches a queue for new data, then writes that
 data to an hdf5 file.
@@ -14,7 +13,8 @@ tag: str that will be used to name the dataset
 dtype: datatype that will be written. Suggested: 'd' (double)
 chunk: chunksize of data that will be written to the queue. Also used
 	to parameterize the hdf5 file chunk size
-"""
+	"""
+def stream_to_file(queue, fname, tag, dtype, chunk):
 	#create hdf5 file
 	f_out = h5py.File(fname, 'w-')
 	#create the dataset
@@ -35,30 +35,32 @@ chunk: chunksize of data that will be written to the queue. Also used
 	f_out.close()
 	return 1
 
-def queue_creator(chans):
 """
 creates a dectionary of nchan queues keyed by channel name
 chans is a LIST of channels (int)
 """
+def queue_creator(chans):
 	result = {}
 	for n in chans:
 		result[n] = mp.Queue()
 	return result
 
 
-def TDT_stream(TDT_obj, chans, save_folder, chunk, 
-	flag, dtype = 'd', tag = "raw_voltage"):
-	"""
-	TODO: FIGURE OUT WHAT "FLAG" is going to be (mp.Event? some kind of IO trigger?)
-	This function takes a TDT activeX object
-	and streams the data from n channels to file.
-	There are some assumtions about the structure of the RZ2 circuit:
-	1)
-	Args
-	TDT_obj: an RZ2 (or similar) class object from TDT_control_ax.py
-	nchan: channels to stream. This is a LIST of channels.
-	save_folder: the folder location to save the data files.
-	"""
+"""
+TODO: FIGURE OUT WHAT "FLAG" is going to be (mp.Event? some kind of IO trigger?)
+This function takes a TDT activeX object
+and streams the data from n channels to file.
+There are some assumtions about the structure of the RZ2 circuit:
+1)
+Args
+TDT_obj: an RZ2 (or similar) class object from TDT_control_ax.py
+nchan: channels to stream. This is a LIST of channels.
+save_folder: the folder location to save the data files.
+"""
+def TDT_stream(TDT_obj, chans, save_folder, chunk, flag):
+	##TODO: add these to the arglist somehow and make it still compatible with the GUI
+	tag = "raw_voltage"
+	dtype = "d"
 	##check that the circuit is running (start if not running)
 	if not TDT_obj.is_running:
 		TDT_obj.start()
