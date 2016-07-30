@@ -46,8 +46,10 @@ chans is a LIST of channels (int)
 	return result
 
 
-def TDT_stream(TDT_obj, chans, save_folder):
+def TDT_stream(TDT_obj, chans, save_folder, chunk, 
+	flag, dtype = 'd', tag = "raw_voltage"):
 	"""
+	TODO: FIGURE OUT WHAT "FLAG" is going to be (mp.Event? some kind of IO trigger?)
 	This function takes a TDT activeX object
 	and streams the data from n channels to file.
 	There are some assumtions about the structure of the RZ2 circuit:
@@ -67,8 +69,38 @@ def TDT_stream(TDT_obj, chans, save_folder):
 	##generate a list of argument lists
 	arg_lists = []
 	for chan in chans:
-		arg_lists.append([queue_dict[chan], save_folder+"/"+chan+".hdf5", ])
-	pool.apply_async(stream_to_file, )
+		arg_lists.append([queue_dict[chan], save_folder+"/"+chan+".hdf5", 
+			tag, dtype, chunk])
+	pool.imap_unordered(stream_to_file, arg_lists)
+	##workers should now be waiting to stream data to disc...
+	##start streaming data from the RZ2 to the waiting queues
+	##create a dictionary to store the index values of each channel
+	idx_dict = {}
+	for chan in chans:
+		idx_dict[chan] = TDT_obj.get_tag(chan+"_i")
+	while flag.is_set():
+		for chan in chans:
+			##see if buffer has advanced beyond 1 chunk size of last check
+			current_idx = TDT_obj.get_tag(chan+"_i")
+			last_idx = idx_dict[chan]
+			if current_idx >= last_idx+chunk:
+				##grab the data
+				data = TDT_obj.read_target(chan, last_idx, chunk, 1, 'd', 'd') ##*******TODO**********: check on the last two params- source type and dest type
+				##add new data to the appropriate queue (we will use the blocking call
+				##so we don't overwrite any unprocessed data there)
+				queue_dict[chan].put(data)
+				##update the index dictionary
+				idx_dict[chan] = last_idx+chunk
+	##send the poison pill to kill the processess
+	##(which will also close out the files)
+	for chan in chans:
+		queue_dict[chan].put(None)
+
+			
+
+
+
+
 
 	
 
