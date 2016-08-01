@@ -32,7 +32,7 @@ rz2.load_circuit(local = False, start = False)
 chunk_size = chunk_size*rz2.get_fs()
 
 ##channels to add. TODO: make this an editable GUI thing
-channels = [str(n) for n in range(0,32)]
+channels = range(1,33)
 
 
 ##GUI functions and widgets##
