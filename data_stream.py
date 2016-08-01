@@ -16,23 +16,23 @@ chunk: chunksize of data that will be written to the queue. Also used
 	"""
 def stream_to_file(queue, fname, tag, dtype, chunk):
 	#create hdf5 file
-	f_out = h5py.File(fname, 'w-')
-	#create the dataset
-	dset = f_out.create_dataset(tag, (0,), dtype = dtype, chunks = (chunk,),
-		maxshape = (None,))
-	##poll the queue
-	data = queue.get()
-	##sending None into the queue will kill the process
-	while data != None:
-		idx = dset.size
-		##increase the size of the dataset to accomodate new data block
-		dset.resize((idx+chunk,))
-		##append new data to the end of the current dset
-		dset[idx:] = data
-		##re-poll the queue. This is a blocking call, ie the process will wait 
-		#for new data
+	with h5py.File(fname, 'w-') as f_out:
+		#create the dataset
+		dset = f_out.create_dataset(tag, (0,), dtype = dtype, chunks = (chunk,),
+			maxshape = (None,))
+		##poll the queue
 		data = queue.get()
-	f_out.close()
+		##sending None into the queue will kill the process
+		while data != None:
+			idx = dset.size
+			##increase the size of the dataset to accomodate new data block
+			dset.resize((idx+chunk,))
+			##append new data to the end of the current dset
+			dset[idx:] = data
+			##re-poll the queue. This is a blocking call, ie the process will wait 
+			#for new data
+			data = queue.get()
+		f_out.close()
 	return 1
 
 """
@@ -67,25 +67,29 @@ def TDT_stream(TDT_obj, chans, save_folder, chunk, flag):
 	##create a dictionary of queues for each active channel
 	queue_dict = queue_creator(chans)
 	##spawn processes to stream the data
-	pool = mp.Pool(len(chans))
+	#pool = mp.Pool(len(chans))
 	##generate a list of argument lists
 	arg_lists = []
 	for chan in chans:
 		arg_lists.append([queue_dict[chan], save_folder+"/"+str(chan)+".hdf5", 
 			tag, dtype, chunk])
-	pool.imap_unordered(stream_to_file, arg_lists)
+	#pool.map_async(stream_to_file, arg_lists)
+	p = mp.Process(target = stream_to_file, args = arg_lists[0])
+	p.start()
 	##workers should now be waiting to stream data to disc...
 	##start streaming data from the RZ2 to the waiting queues
 	##create a dictionary to store the index values of each channel
 	idx_dict = {}
 	for chan in chans:
 		idx_dict[chan] = TDT_obj.get_tag(str(chan)+"_i")
+		print "current index is " + str(idx_dict[chan])
+#	print "about to start loop; flag = " +str(flag.is_set())
 	while flag.is_set():
 		for chan in chans:
 			##see if buffer has advanced beyond 1 chunk size of last check
 			current_idx = TDT_obj.get_tag(str(chan)+"_i")
 			last_idx = idx_dict[chan]
-			if current_idx >= last_idx+chunk:
+			if current_idx >= last_idx+chunk: ##AHA! Need to account for circularity of the buffer :)
 				##grab the data
 				data = TDT_obj.read_target(str(chan), last_idx, chunk, 1, 'F32', 'F64') ##*******TODO**********: check on the last two params- source type and dest type
 				##add new data to the appropriate queue (we will use the blocking call
@@ -97,6 +101,9 @@ def TDT_stream(TDT_obj, chans, save_folder, chunk, flag):
 	##(which will also close out the files)
 	for chan in chans:
 		queue_dict[chan].put(None)
+	##stop the circuit
+	print "Recording complete: stopping circuit"
+	TDT_obj.stop()
 
 			
 

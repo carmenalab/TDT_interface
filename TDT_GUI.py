@@ -9,6 +9,7 @@ import TDT_control_ax as TDT
 import data_stream as stream
 import time
 import os
+import threading as thread
 
 ##GLOBAL VARIABLES##
 
@@ -21,7 +22,7 @@ if not os.path.exists(rootFolder):
 myFont = ("Helvetica", 18)
 
 ##path of circuit to load to hardware
-circ_path = ""
+circ_path = r"C:\Users\TDT\Documents\tdt_circuits\recording_circuit_basic.rcx"
 
 ##size of data chunks to stream, in seconds
 chunk_size = 0.1
@@ -32,7 +33,7 @@ rz2.load_circuit(local = False, start = False)
 chunk_size = chunk_size*rz2.get_fs()
 
 ##channels to add. TODO: make this an editable GUI thing
-channels = range(1,33)
+channels = range(1,17)
 
 
 ##GUI functions and widgets##
@@ -82,13 +83,14 @@ class controlButton(Tk.Frame):
 	def __init__(self, parent, name, function, args = None, add_flag = False):
 		self.name = name
 		self.function = function
-		self.state = False
+		self.state = thread.Event()
+		self.state.clear()
 		self.args = args
 		if args is not None and add_flag == True:
-			self.args.append(self.state)
-		Tk.Frame.__init__(self,parent,width=250,height=150,relief=Tk.SUNKEN,bd=1,padx=5,pady=5)
+			self.args = self.args + (self.state,)
+		Tk.Frame.__init__(self,parent,width=250,height=150,bd=1,padx=5,pady=5)
 		self.parent = parent
-		self.configure(**kw)
+#		self.configure(**kw)
 		self.cmdState = Tk.IntVar()
 		self.label = Tk.Label(self, text = self.name, font = myFont)
 		self.set_state = Tk.Checkbutton(self, text = "On/Off", font = myFont, 
@@ -102,27 +104,35 @@ class controlButton(Tk.Frame):
 		"""reads the current state of the checkbox,
 		updates LED widget, calls function and sets variable
 		"""
-		self.state = self.cmdState.get()
+		if self.cmdState.get() == True:
+			self.state.set()
+		elif self.cmdState.get() == False:
+			self.state.clear()
 		self.updateLED()
-		if self.state:
+		if self.state.is_set():
 			if self.args == None:
 				self.function()
 			else:
 				##call "function" with "args"
+#				print "about to call with state = " + str(self.args[-1].is_set())
 				self.function(*self.args)
+#				print "call complete; state = " + str(self.args[-1].is_set())
 
 	def updateLED(self):
-		self.led.set(self.state)
+		if self.state.is_set():
+			self.led.set(True)
+		elif self.state.is_set() == False:
+			self.led.set(False)
 
 
 ##create some control buttons
-circuitButton = controlButton(mainWin, "start circuit", rz2.start(), args = None)
+circuitButton = controlButton(mainWin, "start circuit", rz2.start, args = None)
 
 recordButton = controlButton(mainWin, "Record", stream.TDT_stream, args = (rz2, channels,
 	rootFolder, chunk_size), add_flag = True)
 
 circuitButton.grid(row = 0, column = 0)
-recordBbutton.grid(row = 1, column = 0)
+recordButton.grid(row = 1, column = 0)
 
 
 
