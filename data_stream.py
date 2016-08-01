@@ -87,9 +87,11 @@ def TDT_stream(TDT_obj, chans, save_folder, chunk, flag):
 	while flag.is_set():
 		for chan in chans:
 			##see if buffer has advanced beyond 1 chunk size of last check
-			current_idx = TDT_obj.get_tag(str(chan)+"_i")
-			last_idx = idx_dict[chan]
-			if current_idx >= last_idx+chunk: ##AHA! Need to account for circularity of the buffer :)
+			current_idx = TDT_obj.get_tag(str(chan)+"_i") ##current buffer pos
+			last_idx = idx_dict[chan] ##last read index
+			buf_size = TDT_obj.get_size(str(chan)) ##TODO: move this out of the loop
+			##case 1: buffer has not yet wrapped back to 0:
+			if current_idx-last_idx <= chunk:
 				##grab the data
 				data = TDT_obj.read_target(str(chan), last_idx, chunk, 1, 'F32', 'F64') ##*******TODO**********: check on the last two params- source type and dest type
 				##add new data to the appropriate queue (we will use the blocking call
@@ -97,6 +99,15 @@ def TDT_stream(TDT_obj, chans, save_folder, chunk, flag):
 				queue_dict[chan].put(data)
 				##update the index dictionary
 				idx_dict[chan] = last_idx+chunk
+			##case 2: buffer has wrapped back to 0
+			elif (current_idx < last_idx) and (buf_size-last_idx+current_idx >= chunk):
+				##grab the data- TDT seems to automatically wrap the buffer during reads
+				data = TDT_obj.read_target(str(chan), last_idx, chunk, 1, 'F32', 'F64')
+				##add new data to the appropriate queue (we will use the blocking call
+				##so we don't overwrite any unprocessed data there)
+				queue_dict[chan].put(data)
+				##update the index dictionary
+				idx_dict[chan] = chunk-(buf_size-last_idx)
 	##send the poison pill to kill the processess
 	##(which will also close out the files)
 	for chan in chans:
