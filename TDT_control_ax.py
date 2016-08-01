@@ -82,6 +82,13 @@ class RZ2:
 			self.is_running = False
 		return result
 
+	#to check the size of a buffer
+	def get_size(self, tag_name):
+		result = self.dsp.GetTagSize(tag_name)
+		if result == 0:
+			print "Invalid Tag"
+		return result
+
 	##to set parameter tag values. Requires string tag_name and 
 	##value to set parameter to
 	def set_tag(self, tag_name, value):
