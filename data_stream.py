@@ -54,7 +54,7 @@ There are some assumtions about the structure of the RZ2 circuit:
 1)
 Args
 TDT_obj: an RZ2 (or similar) class object from TDT_control_ax.py
-nchan: channels to stream. This is a LIST of channels.
+nchan: channels to stream. This is a LIST of channels as ints
 save_folder: the folder location to save the data files.
 """
 def TDT_stream(TDT_obj, chans, save_folder, chunk, flag):
@@ -71,7 +71,7 @@ def TDT_stream(TDT_obj, chans, save_folder, chunk, flag):
 	##generate a list of argument lists
 	arg_lists = []
 	for chan in chans:
-		arg_lists.append([queue_dict[chan], save_folder+"/"+chan+".hdf5", 
+		arg_lists.append([queue_dict[chan], save_folder+"/"+str(chan)+".hdf5", 
 			tag, dtype, chunk])
 	pool.imap_unordered(stream_to_file, arg_lists)
 	##workers should now be waiting to stream data to disc...
@@ -79,15 +79,15 @@ def TDT_stream(TDT_obj, chans, save_folder, chunk, flag):
 	##create a dictionary to store the index values of each channel
 	idx_dict = {}
 	for chan in chans:
-		idx_dict[chan] = TDT_obj.get_tag(chan+"_i")
+		idx_dict[chan] = TDT_obj.get_tag(str(chan)+"_i")
 	while flag.is_set():
 		for chan in chans:
 			##see if buffer has advanced beyond 1 chunk size of last check
-			current_idx = TDT_obj.get_tag(chan+"_i")
+			current_idx = TDT_obj.get_tag(str(chan)+"_i")
 			last_idx = idx_dict[chan]
 			if current_idx >= last_idx+chunk:
 				##grab the data
-				data = TDT_obj.read_target(chan, last_idx, chunk, 1, 'd', 'd') ##*******TODO**********: check on the last two params- source type and dest type
+				data = TDT_obj.read_target(str(chan), last_idx, chunk, 1, 'F32', 'F64') ##*******TODO**********: check on the last two params- source type and dest type
 				##add new data to the appropriate queue (we will use the blocking call
 				##so we don't overwrite any unprocessed data there)
 				queue_dict[chan].put(data)
