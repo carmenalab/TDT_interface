@@ -1,6 +1,21 @@
 ##mp_test.py
 import h5py
-import multiprocessing as mp
+import TDT_control_ax as tdt
+import time
+import numpy as np
+
+"""
+Defines a DataPiece class which is essentially a
+snippet of data with some metadata attached that
+signals where it came from and  thus where
+it belongs in the file
+"""
+class DataPiece:
+	def __init__(self, tag, data):
+		self.tag = tag
+		self.data = data
+		self.size = len(data)
+
 
 """
 function that watches a queue for new data, then writes that
@@ -9,115 +24,126 @@ data to an hdf5 file.
 args: 
 queue: a multiprocessing.Queue() object to watch
 fname: str containing the path of the file to write to
-tag: str that will be used to name the dataset
-dtype: datatype that will be written. Suggested: 'd' (double)
-chunk: chunksize of data that will be written to the queue. Also used
-	to parameterize the hdf5 file chunk size
 	"""
-def stream_to_file(queue, fname, tag, dtype, chunk):
+def write_to_file(queue, fname):
+	##set up a dictionary to keep track of the write indexes
+	last_written = {}
 	#create hdf5 file
-	with h5py.File(fname, 'w-') as f_out:
-		#create the dataset
-		dset = f_out.create_dataset(tag, (0,), dtype = dtype, chunks = (chunk,),
-			maxshape = (None,))
+	with h5py.File(fname, 'w') as f_out:
 		##poll the queue
 		data = queue.get()
+		##"data" is a class object
 		##sending None into the queue will kill the process
 		while data != None:
-			idx = dset.size
-			##increase the size of the dataset to accomodate new data block
-			dset.resize((idx+chunk,))
-			##append new data to the end of the current dset
-			dset[idx:] = data
+			##see if there is an entry in the index dictionary;
+			##if not create it
+			if data.tag not in last_written.keys():
+				last_written[data.tag] = 0
+			##the index of the END of last write
+			idx = last_written[data.tag]
+			##append the data to the correct dataset. If the dset
+			##isn't big enough, exit the loop and close out the file
+			try:
+				f_out[str(data.tag)][idx:idx+data.size] = data.data
+			except TypeError:
+				print "Reached the file limit- recording stopped!"
+				break
+			##update the index dictionary
+			last_written[data.tag]+=data.size
 			##re-poll the queue. This is a blocking call, ie the process will wait 
 			#for new data
 			data = queue.get()
+		##if recording has ended, trim the unwritten ends off of the end 
+		##of the datasets
+		for chan in last_written.keys():
+			idx = last_written[chan]
+			f_out[str(chan)].resize((idx,))
 		f_out.close()
 	return 1
 
 """
-creates a dectionary of nchan queues keyed by channel name
-chans is a LIST of channels (int)
+This is a function that sets up an HDF5 file 
+with the correct dataset settings and dset names
+given a list of channel numbers (as int), a filename (str)
+and the max duration of the recording (in mins). ***NOTE*** Program will
+stop saving when recording time exceeds this variable!!!
+fs is the sample rate in samples/sec.
 """
-def queue_creator(chans):
-	result = {}
-	for n in chans:
-		result[n] = mp.Queue()
-	return result
+def setup_file(fname, chans, max_duration, fs = 25000):
+	max_samples = fs*60*max_duration
+	##make sure there isn't anything weird going on
+	assert max_samples == int
+	##createe the file
+	f = h5py.File(fname, 'w')
+	##create the datasets
+	for chan in chans:
+		f.create_dataset(str(chan), (max_samples,), 
+			maxshape=(max_samples,), dtype = 'f')
+	f.close()
 
 
 """
-TODO: FIGURE OUT WHAT "FLAG" is going to be (mp.Event? some kind of IO trigger?)
-This function takes a TDT activeX object
-and streams the data from n channels to file.
-There are some assumtions about the structure of the RZ2 circuit:
-1)
-Args
-TDT_obj: an RZ2 (or similar) class object from TDT_control_ax.py
-nchan: channels to stream. This is a LIST of channels as ints
-save_folder: the folder location to save the data files.
-"""
-def TDT_stream(TDT_obj, chans, save_folder, chunk, flag):
-	##TODO: add these to the arglist somehow and make it still compatible with the GUI
-	tag = "raw_voltage"
-	dtype = "d"
-	buf_size = TDT_obj.get_size(str(chans[0])) #TODO: make this work in all cases
-	##check that the circuit is running (start if not running)
-	if not TDT_obj.is_running:
-		TDT_obj.start()
-	##create a dictionary of queues for each active channel
-	queue_dict = queue_creator(chans)
-	##generate a dictionary with processes TODO: why the heck does this not work with a Pool??
-	process_dict = {}
+This function connects the RZ2 and loads the specified
+circuit. "Chans" is a list of (int) channel numbers to stream.
+Data is then stored in a DataPiece class and passed to the queue,
+where it can be written to file. Flag is a mp.Event to signal
+start/stop recording.
+Note that this assumes a certain convention when building RPVdsEx
+circuits: buffers storing data are named as a number corresponding to the 
+channel they get data from, and the buffer indices are named as the channel
+number + "_i", as in "5_i."
+""" 
+def hardware_streamer(circ_path, chans, queue, flag):
+	##connect to the processor 
+	rz2 = tdt.RZ2(circ_path)
+	rz2.load_circuit(local = False, start = False)
+	rz2.get_status()
+	if rz2.is_running:
+		rz2.stop()
+	#check that the buffer sizes are equal, and
+	##check that the channels specified are actually available
+	##on the processor
+	buf_sizes = []
 	for chan in chans:
-		arg_list = [queue_dict[chan], save_folder+"/"+str(chan)+".hdf5", 
-			tag, dtype, chunk]
-		p = mp.Process(target = stream_to_file, args = arg_list)
-		p.start()
-	##workers should now be waiting to stream data to disc...
-	##start streaming data from the RZ2 to the waiting queues
-	##create a dictionary to store the index values of each channel
-	idx_dict = {}
+		try:
+			buf_sizes.append(rz2.get_size(str(chan)))
+		except TypeError:
+			print "Check channel numbers"
+			break
+	assert len(set(buf_sizes)) == 1, "Check buffer sizes"
+	##thanks to the above assertion, we can assume all buffers
+	##have the same size:
+	buf_size = buf_sizes[0]
+	##set up a dictionary to store the last read index for each channel
+	last_read = {}
 	for chan in chans:
-		idx_dict[chan] = TDT_obj.get_tag(str(chan)+"_i")
-#	print "about to start loop; flag = " +str(flag.is_set())
+		last_read[chan] = 0
+	##wait for the signal to start
+	while not flag.is_set():
+		time.sleep(0.1) ##TODO: better way of blocking here?
+	##when triggered, start the circuit and start streaming to the queue
+	rz2.start()
 	while flag.is_set():
 		for chan in chans:
-			##see if buffer has advanced beyond 1 chunk size of last check
-			current_idx = TDT_obj.get_tag(str(chan)+"_i") ##current buffer pos
-			last_idx = idx_dict[chan] ##last read index
-			##case 1: buffer has not yet wrapped back to 0:
-			if current_idx-last_idx <= chunk:
-				##grab the data
-				data = TDT_obj.read_target(str(chan), last_idx, chunk, 1, 'F32', 'F64') ##*******TODO**********: check on the last two params- source type and dest type
-				##add new data to the appropriate queue (we will use the blocking call
-				##so we don't overwrite any unprocessed data there)
-				queue_dict[chan].put(data)
-				##update the index dictionary
-				idx_dict[chan] = last_idx+chunk
-			##case 2: buffer has wrapped back to 0
-			elif (current_idx < last_idx) and ((buf_size-last_idx)+current_idx >= chunk):
-				##grab the data- TDT seems to automatically wrap the buffer during reads
-				data = TDT_obj.read_target(str(chan), last_idx, chunk, 1, 'F32', 'F64')
-				##add new data to the appropriate queue (we will use the blocking call
-				##so we don't overwrite any unprocessed data there)
-				queue_dict[chan].put(data)
-				##update the index dictionary
-				idx_dict[chan] = chunk-(buf_size-last_idx)
-	##send the poison pill to kill the processess
-	##(which will also close out the files)
-	for chan in chans:
-		queue_dict[chan].put(None)
-	##stop the circuit
-	print "Recording complete: stopping circuit"
-	TDT_obj.stop()
-
-			
-
-
-
-
-
-	
+			##see where the buffer index is at currently
+			next_index = rz2.get_tag(str(chan)+"_i")
+			##case where buffer has not yet wrapped back to zero
+			if next_index > last_read[chan]:
+				length = next_index - last_read[chan]
+				data = np.asarray(rz2.read_target(str(chan), last_read[chan], length))
+			##case where buffer has wrapped back to zero
+			elif next_index < last_read[chan]:
+				length_a = buf_size - last_read[chan]
+				data_a = np.asarray(rz2.read_target(str(chan), last_read[chan], length_a))
+				data_b = np.asarray(rz2.read_target(str(chan), 0, next_index))
+				data = np.concatenate(data_a, data_b)
+			queue.put(DataPiece(chan, data))
+			last_read[chan] = next_index
+	##when the flag goes off, signal the writer process
+	queue.put(None)
+	except SystemError, e:
+		print("Error acquiring data: {}".format(e))
+	rz2.stop()
+	print "Recording ended"
 
 

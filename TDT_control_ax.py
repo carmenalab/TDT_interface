@@ -86,7 +86,7 @@ class RZ2:
 	def get_size(self, tag_name):
 		result = self.dsp.GetTagSize(tag_name)
 		if result == 0:
-			print "Invalid Tag"
+			raise TypeError("Invalid Tag")
 		return result
 
 	##to set parameter tag values. Requires string tag_name and 
