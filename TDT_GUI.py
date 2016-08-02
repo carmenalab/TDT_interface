@@ -21,7 +21,7 @@ if not os.path.exists(rootFolder):
 fname = "animalx.hdf5"
 
 ##the full file path
-filepath = os.join(rootFolder, fname)
+filepath = os.path.join(rootFolder, fname)
 
 ##font style
 myFont = ("Helvetica", 18)

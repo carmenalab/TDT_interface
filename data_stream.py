@@ -70,9 +70,7 @@ stop saving when recording time exceeds this variable!!!
 fs is the sample rate in samples/sec.
 """
 def setup_file(fname, chans, max_duration, fs = 25000):
-	max_samples = fs*60*max_duration
-	##make sure there isn't anything weird going on
-	assert max_samples == int
+	max_samples = int(fs*60*max_duration)
 	##createe the file
 	f = h5py.File(fname, 'w')
 	##create the datasets
@@ -141,8 +139,8 @@ def hardware_streamer(circ_path, chans, queue, flag):
 			last_read[chan] = next_index
 	##when the flag goes off, signal the writer process
 	queue.put(None)
-	except SystemError, e:
-		print("Error acquiring data: {}".format(e))
+	# except SystemError, e:
+	# 	print("Error acquiring data: {}".format(e))
 	rz2.stop()
 	print "Recording ended"
 
