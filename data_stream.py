@@ -61,35 +61,31 @@ def TDT_stream(TDT_obj, chans, save_folder, chunk, flag):
 	##TODO: add these to the arglist somehow and make it still compatible with the GUI
 	tag = "raw_voltage"
 	dtype = "d"
+	buf_size = TDT_obj.get_size(str(chans[0])) #TODO: make this work in all cases
 	##check that the circuit is running (start if not running)
 	if not TDT_obj.is_running:
 		TDT_obj.start()
 	##create a dictionary of queues for each active channel
 	queue_dict = queue_creator(chans)
-	##spawn processes to stream the data
-	#pool = mp.Pool(len(chans))
-	##generate a list of argument lists
-	arg_lists = []
+	##generate a dictionary with processes TODO: why the heck does this not work with a Pool??
+	process_dict = {}
 	for chan in chans:
-		arg_lists.append([queue_dict[chan], save_folder+"/"+str(chan)+".hdf5", 
-			tag, dtype, chunk])
-	#pool.map_async(stream_to_file, arg_lists)
-	p = mp.Process(target = stream_to_file, args = arg_lists[0])
-	p.start()
+		arg_list = [queue_dict[chan], save_folder+"/"+str(chan)+".hdf5", 
+			tag, dtype, chunk]
+		p = mp.Process(target = stream_to_file, args = arg_list)
+		p.start()
 	##workers should now be waiting to stream data to disc...
 	##start streaming data from the RZ2 to the waiting queues
 	##create a dictionary to store the index values of each channel
 	idx_dict = {}
 	for chan in chans:
 		idx_dict[chan] = TDT_obj.get_tag(str(chan)+"_i")
-		print "current index is " + str(idx_dict[chan])
 #	print "about to start loop; flag = " +str(flag.is_set())
 	while flag.is_set():
 		for chan in chans:
 			##see if buffer has advanced beyond 1 chunk size of last check
 			current_idx = TDT_obj.get_tag(str(chan)+"_i") ##current buffer pos
 			last_idx = idx_dict[chan] ##last read index
-			buf_size = TDT_obj.get_size(str(chan)) ##TODO: move this out of the loop
 			##case 1: buffer has not yet wrapped back to 0:
 			if current_idx-last_idx <= chunk:
 				##grab the data
@@ -100,7 +96,7 @@ def TDT_stream(TDT_obj, chans, save_folder, chunk, flag):
 				##update the index dictionary
 				idx_dict[chan] = last_idx+chunk
 			##case 2: buffer has wrapped back to 0
-			elif (current_idx < last_idx) and (buf_size-last_idx+current_idx >= chunk):
+			elif (current_idx < last_idx) and ((buf_size-last_idx)+current_idx >= chunk):
 				##grab the data- TDT seems to automatically wrap the buffer during reads
 				data = TDT_obj.read_target(str(chan), last_idx, chunk, 1, 'F32', 'F64')
 				##add new data to the appropriate queue (we will use the blocking call
