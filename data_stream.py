@@ -128,12 +128,15 @@ def hardware_streamer(circ_path, chans, queue, flag):
 			##case where buffer has not yet wrapped back to zero
 			if next_index > last_read[chan]:
 				length = next_index - last_read[chan]
-				data = np.asarray(rz2.read_target(str(chan), last_read[chan], length))
+				data = np.asarray(rz2.read_target(str(chan), last_read[chan], 
+					length, 1, "F32", "F32"))
 			##case where buffer has wrapped back to zero
 			elif next_index < last_read[chan]:
 				length_a = buf_size - last_read[chan]
-				data_a = np.asarray(rz2.read_target(str(chan), last_read[chan], length_a))
-				data_b = np.asarray(rz2.read_target(str(chan), 0, next_index))
+				data_a = np.asarray(rz2.read_target(str(chan), last_read[chan], 
+					length_a, 1, "F32", "F32"))
+				data_b = np.asarray(rz2.read_target(str(chan), 0, next_index,
+					1, "F32", "F32"))
 				data = np.concatenate(data_a, data_b)
 			queue.put(DataPiece(chan, data))
 			last_read[chan] = next_index
