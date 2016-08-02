@@ -36,7 +36,7 @@ channels = range(1,33)
 max_duration = 120 ##TODO: add to editable GUI
 
 ##create shared objects to synchronize processes
-dataQueue = mp.Queue()
+dataQueue = mp.Queue(maxsize=len(channels))
 startFlag = mp.Event()
 startFlag.clear()
 

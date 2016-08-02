@@ -74,13 +74,13 @@ fs is the sample rate in samples/sec.
 """
 def setup_file(f_root, chans, max_duration, fs = 25000):
 	max_samples = int(fs*60*max_duration)
-	file_dict = {}
-	##createe the files
+	##createe the file
+	f = h5py.File(f_root, 'w')
 	##create the datasets
 	for chan in chans:
-		file_dict[chan] = h5py.File
 		f.create_dataset(str(chan), (max_samples,), 
-			maxshape=(max_samples,), dtype = 'f', compression = 'lzf')
+			maxshape=(max_samples,), dtype = 'f', compression = 'gzip', 
+			compression_opts=9)
 	f.close()
 
 
@@ -141,7 +141,16 @@ def hardware_streamer(circ_path, chans, queue, flag):
 					length_a, 1, "F32", "F32")).squeeze()
 				data_b = np.asarray(rz2.read_target(str(chan), 0, next_index,
 					1, "F32", "F32")).squeeze()
-				data = np.concatenate((data_a, data_b))
+				try:
+					data = np.concatenate((data_a, data_b))
+				except ValueError:
+					if data_a.shape[0] == 0 and data_b.shape[0] != 0:
+						data = data_b
+					elif data_b.shape[0] == 0: and data_a.shape[0] != 0:
+						data = data_a
+					else:
+						print "Error: data pieces have sizes "+str(data_a.shape)+" and "+str(data_b.shape)
+						data = np.zeros((length_a+next_index))
 			queue.put(DataPiece(chan, data))
 			last_read[chan] = next_index
 	##when the flag goes off, signal the writer process
