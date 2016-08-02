@@ -117,6 +117,7 @@ class controlButton(Tk.Frame):
 		self.function = function
 		self.state = False
 		self.args = args
+		self.flag = flag
 		Tk.Frame.__init__(self,parent,width=250,height=150,bd=1,padx=5,pady=5)
 		self.parent = parent
 #		self.configure(**kw)
@@ -149,9 +150,9 @@ class controlButton(Tk.Frame):
 			self.flag.clear()
 
 	def updateLED(self):
-		if self.state.is_set():
+		if self.state:
 			self.led.set(True)
-		elif self.state.is_set() == False:
+		elif self.state == False:
 			self.led.set(False)
 
 ##some functions to spawn processes to run the recording/streaming functions

@@ -3,6 +3,7 @@ import h5py
 import TDT_control_ax as tdt
 import time
 import numpy as np
+import os
 
 """
 Defines a DataPiece class which is essentially a
@@ -29,7 +30,7 @@ def write_to_file(queue, fname):
 	##set up a dictionary to keep track of the write indexes
 	last_written = {}
 	#create hdf5 file
-	with h5py.File(fname, 'w') as f_out:
+	with h5py.File(fname, 'r+') as f_out:
 		##poll the queue
 		data = queue.get()
 		##"data" is a class object
@@ -55,26 +56,29 @@ def write_to_file(queue, fname):
 			data = queue.get()
 		##if recording has ended, trim the unwritten ends off of the end 
 		##of the datasets
+		print "resizing now"
 		for chan in last_written.keys():
 			idx = last_written[chan]
 			f_out[str(chan)].resize((idx,))
 		f_out.close()
+		print("Done resizing")
 	return 1
 
 """
-This is a function that sets up an HDF5 file 
+This is a function that sets up an HDF5 file dictionary
 with the correct dataset settings and dset names
 given a list of channel numbers (as int), a filename (str)
 and the max duration of the recording (in mins). ***NOTE*** Program will
 stop saving when recording time exceeds this variable!!!
 fs is the sample rate in samples/sec.
 """
-def setup_file(fname, chans, max_duration, fs = 25000):
+def setup_file(f_root, chans, max_duration, fs = 25000):
 	max_samples = int(fs*60*max_duration)
-	##createe the file
-	f = h5py.File(fname, 'w')
+	file_dict = {}
+	##createe the files
 	##create the datasets
 	for chan in chans:
+		file_dict[chan] = h5py.File
 		f.create_dataset(str(chan), (max_samples,), 
 			maxshape=(max_samples,), dtype = 'f')
 	f.close()
@@ -129,15 +133,15 @@ def hardware_streamer(circ_path, chans, queue, flag):
 			if next_index > last_read[chan]:
 				length = next_index - last_read[chan]
 				data = np.asarray(rz2.read_target(str(chan), last_read[chan], 
-					length, 1, "F32", "F32"))
+					length, 1, "F32", "F32")).squeeze()
 			##case where buffer has wrapped back to zero
 			elif next_index < last_read[chan]:
 				length_a = buf_size - last_read[chan]
 				data_a = np.asarray(rz2.read_target(str(chan), last_read[chan], 
-					length_a, 1, "F32", "F32"))
+					length_a, 1, "F32", "F32")).squeeze()
 				data_b = np.asarray(rz2.read_target(str(chan), 0, next_index,
-					1, "F32", "F32"))
-				data = np.concatenate(data_a, data_b)
+					1, "F32", "F32")).squeeze()
+				data = np.concatenate((data_a, data_b))
 			queue.put(DataPiece(chan, data))
 			last_read[chan] = next_index
 	##when the flag goes off, signal the writer process
