@@ -80,7 +80,7 @@ def setup_file(f_root, chans, max_duration, fs = 25000):
 	for chan in chans:
 		file_dict[chan] = h5py.File
 		f.create_dataset(str(chan), (max_samples,), 
-			maxshape=(max_samples,), dtype = 'f')
+			maxshape=(max_samples,), dtype = 'f', compression = 'lzf')
 	f.close()
 
 
