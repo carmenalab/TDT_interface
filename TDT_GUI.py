@@ -152,17 +152,17 @@ class controlButton(Tk.Frame):
 		elif self.state == False:
 			self.led.set(False)
 
-class entryBox(object):
-	def __init__(self, homeFrame, labelText, preset):
+class entryBox(Tk.Frame):
+	def __init__(self, homeFrame, labelText, preset, location):
 		self.homeFrame = homeFrame
 		self.labelText = labelText
 		self.preset = preset
 		self.entryString = Tk.StringVar()
 		self.entryObj = Tk.Entry(homeFrame, textvariable = self.entryString)
-		self.title = Tk.Label(self.homeFrame, text = self.labelText)
+		self.title = Tk.Label(self.homeFrame, text = self.labelText, font=myFont)
 		self.entryString.set(self.preset)
-		self.title.pack(side = 'top')
-		self.entryObj.pack(side = 'top')
+		self.title.grid(row = location[0], column = location[1])
+		self.entryObj.grid(row = location[0], column = location[1]+1)
 
 ##some functions to spawn processes to run the recording/streaming functions
 def init():
@@ -189,7 +189,10 @@ initButton.grid(column = 0, row = 1)
 recordButton = controlButton(mainWin, "Record", record, args = None, flag = startFlag)
 recordButton.grid(row = 0, column = 1)
 
-chanSelect = entryBox(mainWin, "A/D Out Channel", '1')
+chanSelect = entryBox(mainWin, "A/D Out Channel", '1', [3,0])
+
+chanButton = Tk.Button(mainWin, text = "Set A/D", command = set_channel, font = myFont)
+chanButton.grid(column = 2, row = 3)
 
 Tk.mainloop()
 
