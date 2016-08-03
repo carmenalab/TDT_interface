@@ -144,19 +144,18 @@ def hardware_streamer(circ_path, chans, queue, flag):
 				try:
 					data = np.concatenate((data_a, data_b))
 				except ValueError:
-					if data_a.shape[0] == 0 and data_b.shape[0] != 0:
+					if length_a == 0:
 						data = data_b
-					elif data_b.shape[0] == 0: and data_a.shape[0] != 0:
+					elif next_index == 0:
 						data = data_a
 					else:
+						##TODO: figure out what happens when one array is zero size or something
 						print "Error: data pieces have sizes "+str(data_a.shape)+" and "+str(data_b.shape)
 						data = np.zeros((length_a+next_index))
 			queue.put(DataPiece(chan, data))
 			last_read[chan] = next_index
 	##when the flag goes off, signal the writer process
 	queue.put(None)
-	# except SystemError, e:
-	# 	print("Error acquiring data: {}".format(e))
 	rz2.stop()
 	print "Recording ended"
 

@@ -27,7 +27,7 @@ filepath = os.path.join(rootFolder, fname)
 myFont = ("Helvetica", 18)
 
 ##path of circuit to load to hardware
-circ_path = r"C:\Users\TDT\Documents\tdt_circuits\recording_circuit_basic.rcx"
+circ_path = r"C:\Users\TDT\Documents\tdt_circuits\recording_circuit_basic2.rcx"
 
 ##channels to add. TODO: make this an editable GUI thing
 channels = range(1,33)
