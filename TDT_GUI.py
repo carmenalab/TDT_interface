@@ -39,6 +39,7 @@ max_duration = 120 ##TODO: add to editable GUI
 dataQueue = mp.Queue(maxsize=len(channels))
 startFlag = mp.Event()
 startFlag.clear()
+chanOut = mp.Value('i',1)
 
 ##initialize the main window
 mainWin = Tk.Tk()
@@ -88,7 +89,6 @@ class statusLabel(Tk.Frame):
 		self.state = False
 		Tk.Frame.__init__(self,parent,width=250,height=150,bd=1,padx=5,pady=5)
 		self.parent = parent
-#		self.configure(**kw)
 		self.cmdState = Tk.IntVar()
 		self.label = Tk.Label(self, text = self.name, font = myFont)
 		self.led = LED(self, 50)
@@ -120,7 +120,6 @@ class controlButton(Tk.Frame):
 		self.flag = flag
 		Tk.Frame.__init__(self,parent,width=250,height=150,bd=1,padx=5,pady=5)
 		self.parent = parent
-#		self.configure(**kw)
 		self.cmdState = Tk.IntVar()
 		self.label = Tk.Label(self, text = self.name, font = myFont)
 		self.set_state = Tk.Checkbutton(self, text = "On/Off", font = myFont, 
@@ -143,9 +142,7 @@ class controlButton(Tk.Frame):
 				self.function()
 			else:
 				##call "function" with "args"
-#				print "about to call with state = " + str(self.args[-1].is_set())
 				self.function(*self.args)
-#				print "call complete; state = " + str(self.args[-1].is_set())
 		elif self.state == False and self.flag != None:
 			self.flag.clear()
 
@@ -155,6 +152,18 @@ class controlButton(Tk.Frame):
 		elif self.state == False:
 			self.led.set(False)
 
+class entryBox(object):
+	def __init__(self, homeFrame, labelText, preset):
+		self.homeFrame = homeFrame
+		self.labelText = labelText
+		self.preset = preset
+		self.entryString = Tk.StringVar()
+		self.entryObj = Tk.Entry(homeFrame, textvariable = self.entryString)
+		self.title = Tk.Label(self.homeFrame, text = self.labelText)
+		self.entryString.set(self.preset)
+		self.title.pack(side = 'top')
+		self.entryObj.pack(side = 'top')
+
 ##some functions to spawn processes to run the recording/streaming functions
 def init():
 	##create the file to save
@@ -162,7 +171,7 @@ def init():
 	##spawn processes to handle the data
 	writer = mp.Process(target = stream.write_to_file, args = (dataQueue,filepath))
 	streamer = mp.Process(target = stream.hardware_streamer, args = (
-		circ_path, channels, dataQueue, startFlag))
+		circ_path, channels, dataQueue, startFlag, chanOut))
 	writer.start()
 	streamer.start()
 	initialized.toggleState(True)
@@ -170,12 +179,17 @@ def init():
 def record():
 	print "Recording started"
 	##TODO: generate some IO pulse to trigger the pi box logger
+
+def set_channel():
+	chanOut.value = int(chanSelect.entryString.get())
  
 initButton = Tk.Button(mainWin, text = "Init", command = init, font = myFont)
 initButton.grid(column = 0, row = 1)
 
 recordButton = controlButton(mainWin, "Record", record, args = None, flag = startFlag)
 recordButton.grid(row = 0, column = 1)
+
+chanSelect = entryBox(mainWin, "A/D Out Channel", '1')
 
 Tk.mainloop()
 

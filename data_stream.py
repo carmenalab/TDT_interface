@@ -89,13 +89,14 @@ This function connects the RZ2 and loads the specified
 circuit. "Chans" is a list of (int) channel numbers to stream.
 Data is then stored in a DataPiece class and passed to the queue,
 where it can be written to file. Flag is a mp.Event to signal
-start/stop recording.
+start/stop recording. chanOut is a mp.Value object that tells the 
+RZ2 which channel to send to the A/D out port (for oscope/audio monitoring)
 Note that this assumes a certain convention when building RPVdsEx
 circuits: buffers storing data are named as a number corresponding to the 
 channel they get data from, and the buffer indices are named as the channel
 number + "_i", as in "5_i."
 """ 
-def hardware_streamer(circ_path, chans, queue, flag):
+def hardware_streamer(circ_path, chans, queue, flag, chanOut):
 	##connect to the processor 
 	rz2 = tdt.RZ2(circ_path)
 	rz2.load_circuit(local = False, start = False)
@@ -125,7 +126,12 @@ def hardware_streamer(circ_path, chans, queue, flag):
 		time.sleep(0.1) ##TODO: better way of blocking here?
 	##when triggered, start the circuit and start streaming to the queue
 	rz2.start()
+	AD_chan = chanOut.value
+	rz2.set_tag("AD_out",AD_chan)
 	while flag.is_set():
+		if chanOut.value != AD_chan:
+			AD_chan = chanOut.value
+			rz2.set_tag("AD_out", AD_chan)
 		for chan in chans:
 			##see where the buffer index is at currently
 			next_index = rz2.get_tag(str(chan)+"_i")
