@@ -18,7 +18,7 @@ if not os.path.exists(rootFolder):
 	os.makedirs(rootFolder)
 
 ##the name of the file to save ##TODO: make this a GUI option
-fname = "animalx.hdf5"
+fname = "S3_R1.hdf5"
 
 ##the full file path
 filepath = os.path.join(rootFolder, fname)
@@ -30,7 +30,7 @@ myFont = ("Helvetica", 18)
 circ_path = r"C:\Users\TDT\Documents\tdt_circuits\recording_circuit_basic2.rcx"
 
 ##channels to add. TODO: make this an editable GUI thing
-channels = range(1,33)
+channels = range(1,32)
 
 ##max length of recording in mins
 max_duration = 120 ##TODO: add to editable GUI
