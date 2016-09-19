@@ -106,7 +106,7 @@ class RZ2:
 
 	##to send a software trigger
 	def send_trig(self, trig_num):
-		if self.dsp.SoftTrg(1) == 0:
+		if self.dsp.SoftTrg(trig_num) == 0:
 			raise SystemError, "Cannot connect to hardware"
 
 	##to get the dataype of a target tag
