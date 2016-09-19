@@ -8,34 +8,45 @@
 from psychopy import visual
 from psychopy import core
 from psychopy import info
-import TDT_control_ax as TDT
+import TDT_control_ax as TDT_control
 import matplotlib.pyplot as plt
 import h5py
 import numpy as np
 #from multiprocessing.pool import ThreadPool
 import pickle
 from scipy.signal import butter, lfilter
+import os
+import time
 
 ##grating variables
 #directions of movement (list). -1 is the baseline gray screen
 ##***NOTE: for plotting to be correct, the gray screen value should be last in the array!!!***
 DIRECTIONS = np.array([0, 45, 90, 135, 180, 225, 270, 315, -1])
 #the spatial frequency of the grating in cycles/degree
-SPATIAL_FREQ = 0.04
+SPATIAL_FREQ = 0.08
 ##amount of time to display the gray screen in seconds
-GRAY_TIME = 1.5
+GRAY_TIME = 2.0
 ##amount of time to display the drifting grating in seconds
 DRIFT_TIME = 2.0
 #the number of times to repeat the full set of gratings
-NUM_SETS = 6
+NUM_SETS = 2
+##NUM_CHANNELS = number of channels
+NUM_CHANNELS = 64
 ##the location of the TDT circuit file to load
-CIRCUIT_LOC = r"C:\Users\TDT-RAT\Google Drive\carmena_lab\TDT\nd_circuit_16ch.rcx"
+CIRCUIT_LOC = r"C:\Users\Carmena\Documents\tdt_circuits\V1_test_circuit.rcx"
 ##the location to save the data
-SAVE_LOC = r"C:\Data\ND\5_13_16\laminar_probe4.hdf5"
-#r"C:\Users\TDT-RAT\Desktop\test1.hdf5"
-FIG_LOC = r"C:\Data\ND\5_13_16\laminar_probe4_"
+##a root folder to store the data. Make it if it does not exist.
+rootFolder = os.path.normpath("D:/"+time.strftime("%m_%d_%y"))
+if not os.path.exists(rootFolder):
+	os.makedirs(rootFolder)
+##the name of the file to save ##TODO: make this a GUI optionexi
+fname = "test1.hdf5"
+fig_fname = "test1"
+##the full file path
+data_filepath = os.path.join(rootFolder, fname)
+fig_filepath = os.path.join(rootFolder, fig_fname)
 ##create an HDF5 file in which to save the data
-dataFile = h5py.File(SAVE_LOC, 'w-')
+dataFile = h5py.File(data_filepath, 'w')
 ##load the spcified circuit file and connect to the processor
 """
 NOTE: Loading the wrong file isn't immediately obvious and can cause
@@ -66,12 +77,23 @@ def butter_bandpass_filter(data, lowcut, highcut, fs, order=5):
 	return y
 
 ##a function to stream data from the TDT hardware. 
-def get_data(n_chan, n_samp, dtype="F32"):
+##args are obvious except for pause- this value, if not None,
+##intentionally slows down the data rate by pausing in between
+##reads. This is because you can overload the TDT bus by asking for 
+##to much data at once. Value is seconds.
+def get_data(n_chan, n_samp, dtype="F32", pause = None):
 	##allocate memory; channels x samples 
 	data = np.zeros((n_chan, n_samp))
+	##we are assuming the channels are distributed across
+	#multiple processors, and we don't want to grab all channes
+	##from once processor at once and overload it, so randomize the order
+	chans = np.arange(1,n_chan+1) ##TDT channels start at 1
+	np.random.shuffle(chans)
 	##go through each channel and grab however many samples
-	for c in range(n_chan):
-		data[c,:] = RZ2.read_target(str(c), 0, n_samp, 1, dtype, dtype).squeeze()
+	for c in chans:
+		data[c-1,:] = RZ2.read_target(str(c), 0, n_samp, 1, dtype, dtype).squeeze()
+		if pause is not None:
+			time.sleep(pause)
 	return data
 
 
@@ -112,20 +134,18 @@ def run_orientations(plot = False, savefigs = False):
 		ax3.set_title("Spike band", fontsize = 12)
 		ax4.set_title("LFP band", fontsize = 12)
 		fig1.set_size_inches((12,8))
-	##create a file group for orientation data
-	ori_group = dataFile.create_group("orientation")
 	##create a window for the stimuli
-	myWin = visual.Window([1280,1024] ,monitor="rosewill_r910e", units="deg", fullscr = True, screen = 1)
-	##get the system/monitor info (interested in the refresh rate)
-	#print "Testing monitor refresh rate..."
-	#sysinfo = info.RunTimeInfo(author = 'Ryan', version = '1.0', win = myWin, 
-	#	refreshTest = 'grating', userProcsDetailed = False, verbose = False)
-	##get the length in ms of one frame
-	#frame_dur = float(sysinfo['windowRefreshTimeMedian_ms'])
-	frame_dur = 11.7 #calculated beforehand
+	myWin = visual.Window([800,480] ,monitor="RPi_5in", units="deg", fullscr = True, screen = 1)
+	# ##get the system/monitor info (interested in the refresh rate)
+	# print "Testing monitor refresh rate..."
+	# sysinfo = info.RunTimeInfo(author = 'Ryan', version = '1.0', win = myWin, 
+	# 	refreshTest = 'grating', userProcsDetailed = False, verbose = False)
+	# ##get the length in ms of one frame
+	# frame_dur = float(sysinfo['windowRefreshTimeMedian_ms'])
+	frame_dur = 15.22749 #calculated beforehand
 
 	##create a grating object
-	grating = visual.GratingStim(win=myWin, mask = None, size=230,
+	grating = visual.GratingStim(win=myWin, mask = None, size=40,
 	                             pos=[0,0], sf=SPATIAL_FREQ, ori = 0, units = 'deg')
 	##calculate the number of frames needed to produce the correct display time
 	num_frames = int(np.ceil((DRIFT_TIME*1000.0)/frame_dur))
@@ -137,13 +157,13 @@ def run_orientations(plot = False, savefigs = False):
 		##shuffle the orientations
 		np.random.shuffle(DIRECTIONS)
 		##create a file group for this set
-		set_group = ori_group.create_group("set_" + str(setN+1))
+		set_group = dataFile.create_group("set_" + str(setN+1))
 		for repN in range(DIRECTIONS.size):
 			##make sure you are still connected to the RZ2
 			if RZ2.get_status == 0:
 				raise SystemError, "Hardware connection lost"
 			##create a dataset for this orientation
-			dset = set_group.create_dataset(str(DIRECTIONS[repN]), (16,num_samples), dtype = 'f')
+			dset = set_group.create_dataset(str(DIRECTIONS[repN]), (NUM_CHANNELS,num_samples), dtype = 'f')
 			##initialize thread pool to stream data
 			#dpool = ThreadPool(processes = 3)
 			##set the contrast to zero:
@@ -182,7 +202,7 @@ def run_orientations(plot = False, savefigs = False):
 			core.wait(GRAY_TIME)
 			##now save the data to the hdf5 file
 			#raw trace
-			trace_data = get_data(NUM_CHANNELS, num_samples)
+			trace_data = get_data(NUM_CHANNELS, num_samples, pause = .005)
 			dset[:,:] = trace_data
 			if plot:
 				lfp = butter_bandpass_filter(trace_data[4,:], 0.5, 300, fs, 1)
@@ -198,7 +218,7 @@ def run_orientations(plot = False, savefigs = False):
 				fig1.suptitle(str(DIRECTIONS[repN])+" Degrees", fontsize = 18)
 				fig1.canvas.draw()
 				if savefigs:
-					fig1.savefig(FIG_LOC+str(DIRECTIONS[repN])+".svg", format = 'svg')
+					fig1.savefig(fig_filepath+str(DIRECTIONS[repN])+".png", format = 'png')
 			##clean up
 			#dpool.close()
 			#dpool.join()

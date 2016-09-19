@@ -13,21 +13,20 @@ import multiprocessing as mp
 ##GLOBAL VARIABLES##
 
 ##a root folder to store the data. Make it if it does not exist.
-rootFolder = os.path.normpath("C:/Data/"+time.strftime("%m_%d_%y"))
+rootFolder = os.path.normpath("D:/"+time.strftime("%m_%d_%y"))
 if not os.path.exists(rootFolder):
 	os.makedirs(rootFolder)
 
-##the name of the file to save ##TODO: make this a GUI option
-fname = "S3_R1.hdf5"
+##the name of the file to save ##TODO: make this a GUI optionexi
+fname = "SiC_test_sensory2.hdf5"
 
 ##the full file path
 filepath = os.path.join(rootFolder, fname)
-
 ##font style
 myFont = ("Helvetica", 18)
 
 ##path of circuit to load to hardware
-circ_path = r"C:\Users\TDT\Documents\tdt_circuits\recording_circuit_basic2.rcx"
+circ_path = r"C:\Users\Carmena\Documents\tdt_circuits\recording_circuit_basic2.rcx"
 
 ##channels to add. TODO: make this an editable GUI thing
 channels = range(1,32)
