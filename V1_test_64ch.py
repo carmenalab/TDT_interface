@@ -21,7 +21,7 @@ import time
 ##grating variables
 #directions of movement (list). -1 is the baseline gray screen
 ##***NOTE: for plotting to be correct, the gray screen value should be last in the array!!!***
-DIRECTIONS = np.array([0, 45, 90, 135, 180, 225, 270, 315, -1])
+DIRECTIONS = np.array([0, 30, 60, 90, 120, 150, 180, 210, 240, 270, 300, 330, -1])
 #the spatial frequency of the grating in cycles/degree
 SPATIAL_FREQ = 0.08
 ##amount of time to display the gray screen in seconds
@@ -29,7 +29,7 @@ GRAY_TIME = 2.0
 ##amount of time to display the drifting grating in seconds
 DRIFT_TIME = 2.0
 #the number of times to repeat the full set of gratings
-NUM_SETS = 2
+NUM_SETS = 20
 ##NUM_CHANNELS = number of channels
 NUM_CHANNELS = 64
 ##the location of the TDT circuit file to load
@@ -40,8 +40,8 @@ rootFolder = os.path.normpath("D:/"+time.strftime("%m_%d_%y"))
 if not os.path.exists(rootFolder):
 	os.makedirs(rootFolder)
 ##the name of the file to save ##TODO: make this a GUI optionexi
-fname = "test1.hdf5"
-fig_fname = "test1"
+fname = "SiC_test_1.hdf5"
+fig_fname = "SiC_test_1"
 ##the full file path
 data_filepath = os.path.join(rootFolder, fname)
 fig_filepath = os.path.join(rootFolder, fig_fname)
