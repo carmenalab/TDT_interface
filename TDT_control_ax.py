@@ -11,7 +11,9 @@ NOTE: This set of functions works ONLY with RPvdsEx circuits and NOT(!)
 with OpenEx (workbench, openController, etc). It will cause workbench to crash.
 To allow access to parameter tags when using OpenEx, you need to use TDevAccX.
 """
-from win32com.client import Dispatch
+from sys import platform as _platform
+if _platform == 'win32':
+	from win32com.client import Dispatch
 import numpy as np
 import time
 

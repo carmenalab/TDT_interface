@@ -96,7 +96,7 @@ circuits: buffers storing data are named as a number corresponding to the
 channel they get data from, and the buffer indices are named as the channel
 number + "_i", as in "5_i."
 """ 
-def hardware_streamer(circ_path, chans, queue, flag, chanOut):
+def hardware_streamer(circ_path, chans, queue, flag):
 	##connect to the processor 
 	rz2 = tdt.RZ2(circ_path)
 	rz2.load_circuit(local = False, start = False)
@@ -126,12 +126,8 @@ def hardware_streamer(circ_path, chans, queue, flag, chanOut):
 		time.sleep(0.1) ##TODO: better way of blocking here?
 	##when triggered, start the circuit and start streaming to the queue
 	rz2.start()
-	AD_chan = chanOut.value
 	rz2.set_tag("AD_out",AD_chan)
 	while flag.is_set():
-		if chanOut.value != AD_chan:
-			AD_chan = chanOut.value
-			rz2.set_tag("AD_out", AD_chan)
 		for chan in chans:
 			##see where the buffer index is at currently
 			next_index = rz2.get_tag(str(chan)+"_i")
