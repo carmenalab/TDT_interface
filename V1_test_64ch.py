@@ -40,8 +40,8 @@ rootFolder = os.path.normpath("D:/"+time.strftime("%m_%d_%y"))
 if not os.path.exists(rootFolder):
 	os.makedirs(rootFolder)
 ##the name of the file to save ##TODO: make this a GUI optionexi
-fname = "SiC_test_1.hdf5"
-fig_fname = "SiC_test_1"
+fname = "SiC_test_2.hdf5"
+fig_fname = "SiC_test_2"
 ##the full file path
 data_filepath = os.path.join(rootFolder, fname)
 fig_filepath = os.path.join(rootFolder, fig_fname)
