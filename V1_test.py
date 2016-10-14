@@ -9,6 +9,8 @@ from psychopy import visual
 from psychopy import core
 from psychopy import info
 import TDT_control_ax as TDT_control
+import matplotlib
+matplotlib.use("WX")
 import matplotlib.pyplot as plt
 import h5py
 import numpy as np
@@ -30,39 +32,7 @@ GRAY_TIME = 2.0
 DRIFT_TIME = 2.0
 #the number of times to repeat the full set of gratings
 NUM_SETS = 20
-##NUM_CHANNELS = number of channels
-NUM_CHANNELS = 64
-##the location of the TDT circuit file to load
-CIRCUIT_LOC = r"C:\Users\Carmena\Documents\tdt_circuits\V1_test_circuit.rcx"
-##the location to save the data
-##a root folder to store the data. Make it if it does not exist.
-rootFolder = os.path.normpath("D:/"+time.strftime("%m_%d_%y"))
-if not os.path.exists(rootFolder):
-	os.makedirs(rootFolder)
-##the name of the file to save ##TODO: make this a GUI optionexi
-fname = "SiC_test_2.hdf5"
-fig_fname = "SiC_test_2"
-##the full file path
-data_filepath = os.path.join(rootFolder, fname)
-fig_filepath = os.path.join(rootFolder, fig_fname)
-##create an HDF5 file in which to save the data
-dataFile = h5py.File(data_filepath, 'w')
-##load the spcified circuit file and connect to the processor
-"""
-NOTE: Loading the wrong file isn't immediately obvious and can cause
-a lot of headaches!!
-"""
-RZ2 = TDT_control.RZ2(CIRCUIT_LOC)
-##load the RPvdsEx circuit locally
-RZ2.load_circuit(local = True, start = True)
-##get the processor sampling rate
-fs = RZ2.get_fs()
-#print 'sample rate is: ' + str(fs)
-##the number of samples to take from the TDT (duration of each stim rep)
-num_samples = int(np.ceil(fs*(DRIFT_TIME+2*GRAY_TIME)))
-x_axis = np.linspace(0,1000*(GRAY_TIME+DRIFT_TIME+GRAY_TIME), num_samples)
-
-	##define filter functions
+##define filter functions
 def butter_bandpass(lowcut, highcut, fs, order=5):
 	nyq = 0.5 * fs
 	low = lowcut / nyq
@@ -76,31 +46,46 @@ def butter_bandpass_filter(data, lowcut, highcut, fs, order=5):
 	y = lfilter(b, a, data)
 	return y
 
-##a function to stream data from the TDT hardware. 
-##args are obvious except for pause- this value, if not None,
-##intentionally slows down the data rate by pausing in between
-##reads. This is because you can overload the TDT bus by asking for 
-##to much data at once. Value is seconds.
-def get_data(n_chan, n_samp, dtype="F32", pause = None):
-	##allocate memory; channels x samples 
-	data = np.zeros((n_chan, n_samp))
-	##we are assuming the channels are distributed across
-	#multiple processors, and we don't want to grab all channes
-	##from once processor at once and overload it, so randomize the order
-	chans = np.arange(1,n_chan+1) ##TDT channels start at 1
-	np.random.shuffle(chans)
-	##go through each channel and grab however many samples
-	for c in chans:
-		data[c-1,:] = RZ2.read_target(str(c), 0, n_samp, 1, dtype, dtype).squeeze()
-		if pause is not None:
-			time.sleep(pause)
-	return data
 
-
-def run_orientations(plot = False, savefigs = False):
+def run_orientations(save_loc,circ_loc,chans,plot = True):
+	##load the spcified circuit file and connect to the processor
+	"""
+	NOTE: Loading the wrong file isn't immediately obvious and can cause
+	a lot of headaches!!
+	"""
+	RZ2 = TDT_control.RZ2(circ_loc)
+	##load the RPvdsEx circuit locally
+	RZ2.load_circuit(local = True, start = True)
+	##get the processor sampling rate
+	fs = RZ2.get_fs()
+	#print 'sample rate is: ' + str(fs)
+	##the number of samples to take from the TDT (duration of each stim rep)
+	num_samples = int(np.ceil(fs*(DRIFT_TIME+2*GRAY_TIME)))
+	x_axis = np.linspace(0,1000*(GRAY_TIME+DRIFT_TIME+GRAY_TIME), num_samples)
 	##double check that the TDT processors are connected and the circuit is running
 	if RZ2.get_status() != 7:
 		raise SystemError, "Check RZ2 status!"
+	dataFile = h5py.File(save_loc,'w')
+	
+	##a function to stream data from the TDT hardware. 
+	##args are obvious except for pause- this value, if not None,
+	##intentionally slows down the data rate by pausing in between
+	##reads. This is because you can overload the TDT bus by asking for 
+	##to much data at once. Value is seconds.
+	def get_data(chans, n_samp, dtype="F32", pause = None):
+		##allocate memory; channels x samples 
+		data = np.zeros((n_chan, n_samp))
+		##we are assuming the channels are distributed across
+		#multiple processors, and we don't want to grab all channes
+		##from once processor at once and overload it, so randomize the order
+		np.random.shuffle(chans)
+		##go through each channel and grab however many samples
+		for c in chans:
+			data[c-1,:] = RZ2.read_target(str(c), 0, n_samp, 1, dtype, dtype).squeeze()
+			if pause is not None:
+				time.sleep(pause)
+		return data
+
 	print "Running orientation presentation."
 	if plot:
 		fig1 = plt.figure(figsize = (20,10))
@@ -163,7 +148,7 @@ def run_orientations(plot = False, savefigs = False):
 			if RZ2.get_status == 0:
 				raise SystemError, "Hardware connection lost"
 			##create a dataset for this orientation
-			dset = set_group.create_dataset(str(DIRECTIONS[repN]), (NUM_CHANNELS,num_samples), dtype = 'f')
+			dset = set_group.create_dataset(str(DIRECTIONS[repN]), (len(chans),num_samples), dtype = 'f')
 			##initialize thread pool to stream data
 			#dpool = ThreadPool(processes = 3)
 			##set the contrast to zero:
@@ -217,11 +202,6 @@ def run_orientations(plot = False, savefigs = False):
 				ax4.set_ylim(lfp.min(), lfp.max())
 				fig1.suptitle(str(DIRECTIONS[repN])+" Degrees", fontsize = 18)
 				fig1.canvas.draw()
-				if savefigs:
-					fig1.savefig(fig_filepath+str(DIRECTIONS[repN])+".png", format = 'png')
-			##clean up
-			#dpool.close()
-			#dpool.join()
 
 	print "Orientation test complete."
 	myWin.close()
