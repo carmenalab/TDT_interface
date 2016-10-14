@@ -507,7 +507,7 @@ buttonFrame.grid(row=2,column=0)
 ##entry box to pick a channel for analog out
 DACEntry = entryBox(buttonFrame,"DAC out channel","1",0,0)
 ##button to change DAC channel
-DACButton = Tk.Button(buttonFrame,text="Change DAC channel",font=myFont)
+DACButton = Tk.Button(buttonFrame,text="Change DAC channel",font=myFont,command=set_DAC)
 DACButton.grid(row=2,column=0)
 #DACButton.configure()*******************
 buttonFrame2 = Tk.Frame(mainWin)
@@ -541,16 +541,16 @@ ctrlFrame.grid(row=1,column=2)
 streamButton = Tk.Button(ctrlFrame,text="Stream",font=myFont)
 streamButton.grid(row=1,column=0)
 ##to load params to TDT and check status
-initButton = Tk.Button(ctrlFrame,text="Initialize",font=myFont)
+initButton = Tk.Button(ctrlFrame,text="Initialize",font=myFont,command=init)
 initButton.grid(row=0,column=0)
 ##to run the visual tuning test
-tuningButton = Tk.Button(ctrlFrame,text="Tuning test",font=myFont)
+tuningButton = Tk.Button(ctrlFrame,text="Tuning test",font=myFont,command=run_tuning)
 tuningButton.grid(row=2,column=0)
 #to record streaming data
-recordButton = Tk.Button(ctrlFrame,text="Record",font=myFont)
+recordButton = Tk.Button(ctrlFrame,text="Record",font=myFont,command=record)
 recordButton.grid(row = 3, column = 0)
 ##to kill the streaming/recording threads
-stopButton = Tk.Button(ctrlFrame,text="STOP",font=myFont)
+stopButton = Tk.Button(ctrlFrame,text="STOP",font=myFont,command=stop)
 stopButton.grid(row=4,column=0)
 ##another frame cause I need more space!
 paramsFrame = Tk.Frame(mainWin)
