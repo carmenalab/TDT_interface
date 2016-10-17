@@ -225,16 +225,19 @@ def set_DAC():
 def record():
 	global startFlag
 	global dataQueue
+	if dataQueue == None:
+		dataQueue = mp.Queue(maxsize=len(channels))
+	chans = [int(i) for i in chosenLB.unitList] ##channel numbers are str; convert to int
 	save_file = saveEntry.entryString.get()
-	
 	dur = int(maxTimeEntry.entryString.get())
+	circ_path = circEntry.entryString.get()
 	if len(chans) > 0:
 		##create file to save the data
 		stream.setup_file(save_file,chans,dur)
 		##spawn processes to handle the data
-		writer = mp.Process(target = stream.write_to_file, args = (dataQueue,filepath))
+		writer = mp.Process(target = stream.write_to_file, args = (dataQueue,save_file))
 		streamer = mp.Process(target = stream.hardware_streamer, args = (
-			circ_path, channels, dataQueue, startFlag))
+			circ_path, chans, dataQueue, startFlag))
 		writer.start()
 		streamer.start()
 		##give everything a pause to get started

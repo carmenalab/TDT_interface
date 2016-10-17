@@ -4,6 +4,7 @@ import TDT_control_ax as tdt
 import time
 import numpy as np
 import os
+import copy
 
 """
 Defines a DataPiece class which is essentially a
@@ -25,7 +26,7 @@ data to an hdf5 file.
 args: 
 queue: a multiprocessing.Queue() object to watch
 fname: str containing the path of the file to write to
-	"""
+"""
 def write_to_file(queue, fname):
 	##set up a dictionary to keep track of the write indexes
 	last_written = {}
@@ -95,8 +96,10 @@ Note that this assumes a certain convention when building RPVdsEx
 circuits: buffers storing data are named as a number corresponding to the 
 channel they get data from, and the buffer indices are named as the channel
 number + "_i", as in "5_i."
+optional: queue_2 is a second queue to copy data to (in case you want to
+stream to a plotting function as well)
 """ 
-def hardware_streamer(circ_path, chans, queue, flag):
+def hardware_streamer(circ_path, chans, queue, flag,queue_2=None):
 	##connect to the processor 
 	rz2 = tdt.RZ2(circ_path)
 	rz2.load_circuit(local = False, start = False)
@@ -154,7 +157,12 @@ def hardware_streamer(circ_path, chans, queue, flag):
 						##TODO: figure out what happens when one array is zero size or something
 						print "Error: data pieces have sizes "+str(data_a.shape)+" and "+str(data_b.shape)
 						data = np.zeros((length_a+next_index))
-			queue.put(DataPiece(chan, data))
+			this_data = DataPiece(chan,data)
+			if queue_2 != None:
+				that_data = copy.deepcopy(this_data)
+			queue.put(this_data)
+			if queue_2 != None:
+				queue_2.put(that_data)
 			last_read[chan] = next_index
 	##when the flag goes off, signal the writer process
 	queue.put(None)
