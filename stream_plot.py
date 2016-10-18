@@ -14,9 +14,11 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import pprint, inspect
 import numpy as np
 import random
+import oscope
+import multiprocessing as mp
 
 ##for troubleshooting
-chans = [1,2,3,4]
+chans = [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16]
 
 """
 we might have a lot of channels to plot, so it's necessary to get 
@@ -59,7 +61,7 @@ def changeSize(figure, factor,ax_dict):
 	wi,hi = [i*figure.dpi for i in figure.get_size_inches()]
 	mplCanvas.config(width=wi, height=hi)
 	canvas.itemconfigure(cwid, width=wi, height=hi)
-	canvas.config(scrollregion=canvas.bbox(Tkconstants.ALL),width=200,height=200)
+	canvas.config(scrollregion=canvas.bbox(Tkconstants.ALL),width=1500,height=1000)
 	tz.set_fontsize(tz.get_fontsize()*factor)
 	for key in ax_dict.keys():
 		ax = ax_dict[key]
@@ -71,65 +73,6 @@ def changeSize(figure, factor,ax_dict):
 	figure.tight_layout() # matplotlib > 1.1.1
 	#figure.subplots_adjust(left=0.2, bottom=0.15, top=0.86)
 	figure.canvas.draw()
-
-"""
-a class that creates an oscilliscope 
-"""
-class Scope(object):
-	def __init__(self, ax_dict, maxt=1,fs=24414.14):
-		self.ax_dict = ax_dict
-		self.maxt = maxt
-		##just the static x-axis
-		self.tdata = np.linspace(0,1,self.maxt*fs)
-		##populate a dictionary of running y-data
-		self.ydata_dict = {}
-		for key in self.ax_dict.keys():
-			self.ydata_dict[key] = np.zeros(self.tdata.shape)
-		##create lines on each given axis
-		self.line_dict = {}
-		for key in self.ax_dict.keys():
-			self.line_dict[key] = Line2D(self.tdata, self.ydata_dict[key])
-			self.ax_dict[key].add_line(self.line_dict[key])
-			self.ax_dict[key].set_ylim(-0.15,0.15)
-		##to keep track of the "cursor" position on each line
-		self.cursor_dict = {}
-		for key in self.ax_dict.keys():
-			self.cursor_dict[key] = 0
-	
-	##assumes a DataPiece object as an argument
-	def update(self,data_piece):
-		##how big is this data piece?
-		length = data_piece.size
-		chan = data_piece.tag
-		data = data_piece.data
-		##where are we in the plot?
-		current_pos = self.cursor_dict[chan]
-		##if we won't overrun the end, just append the new data
-		if (current_pos+length)<self.tdata.size:
-			self.ydata_dict[chan][current_pos:current_pos+length] = data
-			self.cursor_dict[chan]+=length
-		else:
-			##if we WILL overrun the end, just start from zero
-			##not a perfect solution I guess but it should make things simpler
-			new_start = np.zeros(self.tdata.shape)
-			new_start[0:length] = data
-			self.ydata_dict[chan][:] = new_start
-			self.cursor_dict[chan] = length
-		##update the data
-		self.line_dict[chan].set_ydata(self.ydata_dict[chan][:])
-		return self.line_dict.values()
-
-### this is a placeholder function for now- will be replaced by a func
-##that reads data from the queue
-def dummy_data():
-	while True:
-		##random channel
-		chan = str(np.random.choice(chans))
-		##random data length (like you'd get from TDT)
-		data_len = np.random.randint(600,6000)
-		##streamable object
-		dp = DataPiece(chan,np.random.randn(data_len)/80)
-		yield dp
 
 def read_data(queue,chans):
 	pass
@@ -182,10 +125,17 @@ if __name__ == "__main__":
 	qButton = Tk.Button(buttonFrame, text="quit",
 						 command=lambda :  root.destroy())
 	qButton.grid(column=1, row=3)
+
 	##a dictionary of the oscilliscopes
-	scope = Scope(ax_dict)
-	ani = animation.FuncAnimation(figure,
-			scope.update,dummy_data,interval=0,blit=True)
+	scope_dict = {}
+	for chan in chans:
+		scope_dict[str(chan)] = oscope.Scope(ax_dict[str(chan)])
+	
+
+	ani_dict = {}
+	for chan in chans:
+		ani_dict[str(chan)] = animation.FuncAnimation(figure,
+			scope_dict[str(chan)].update,oscope.emitter,interval=0,blit=True)
 
 	root.mainloop()
 
