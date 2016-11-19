@@ -216,9 +216,9 @@ def set_DAC():
 	global rz2
 	if rz2 is not None:
 		rz2.get_status()
-		if rz2.is_running():
+		if rz2.is_running:
 			new_chan = int(DACEntry.entryString.get())
-			rz2.set_tag("AD_out",AD_chan)
+			rz2.set_tag("AD_out",new_chan)
 	else:
 		print "Can't set A/D channel..."
 
@@ -259,12 +259,13 @@ def stop():
 def run_tuning():
 	global rz2
 	save_file = saveEntry.entryString.get()
-	circ_path = circEntry.entryString.get()
-	chans = [int(i) for i in chosenLB.unitList] ##channel numbers are str; convert to int
+	circ_path = V1_circEntry.entryString.get()
+	user_chans = [int(i) for i in chosenLB.unitList] ##channel numbers are str; convert to int
 	if rz2 is not None:
 		rz2.stop()
-	visual = mp.Process(target=V1_test.run_orientations,args=(save_file,circ_path,chans))
+	visual = mp.Process(target=V1_test.run_orientations,args=(save_file,circ_path,user_chans))
 	visual.start()
+	tuningStatus.toggleState(True)
 
 
 """
@@ -310,6 +311,8 @@ buttonFrame2.grid(row=2,column=1)
 ##entry box for the circuit to load
 circEntry = entryBox(buttonFrame2,"RCX location",
 	r"C:\Users\Carmena\Documents\tdt_circuits\recording_circuit_basic2.rcx",1,0)
+V1_circEntry = entryBox(buttonFrame2,"Tuning RCX file",
+	r"C:\Users\Carmena\Documents\tdt_circuits\V1_test_circuit.rcx",6,0)
 ##entry box for save location
 saveEntry = entryBox(buttonFrame2,"Save location",os.path.join(rootFolder,"test_1"),4,0)
 ##a frame to show the system status

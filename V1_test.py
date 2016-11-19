@@ -25,7 +25,7 @@ import time
 ##***NOTE: for plotting to be correct, the gray screen value should be last in the array!!!***
 DIRECTIONS = np.array([0, 30, 60, 90, 120, 150, 180, 210, 240, 270, 300, 330, -1])
 #the spatial frequency of the grating in cycles/degree
-SPATIAL_FREQ = 0.08
+SPATIAL_FREQ = 0.1
 ##amount of time to display the gray screen in seconds
 GRAY_TIME = 2.0
 ##amount of time to display the drifting grating in seconds
@@ -70,17 +70,20 @@ def run_orientations(save_loc,circ_loc,chans,plot = True):
 	##a function to stream data from the TDT hardware. 
 	##args are obvious except for pause- this value, if not None,
 	##intentionally slows down the data rate by pausing in between
-	##reads. This is because you can overload the TDT bus by asking for 
+	##reads. This is because you can overload th TDT bus by asking for 
 	##to much data at once. Value is seconds.
-	def get_data(chans, n_samp, dtype="F32", pause = None):
+	def get_data(chans_list, n_samp, dtype="F32", pause = None):
+		print "in data loop"
+		n_chan = max(chans_list) ##if there are channels not selected in this range they will be zeros in the data
 		##allocate memory; channels x samples 
 		data = np.zeros((n_chan, n_samp))
 		##we are assuming the channels are distributed across
 		#multiple processors, and we don't want to grab all channes
 		##from once processor at once and overload it, so randomize the order
-		np.random.shuffle(chans)
+		np.random.shuffle(chans_list)
 		##go through each channel and grab however many samples
-		for c in chans:
+		for c in chans_list:
+			print "reading channel "+str(c)
 			data[c-1,:] = RZ2.read_target(str(c), 0, n_samp, 1, dtype, dtype).squeeze()
 			if pause is not None:
 				time.sleep(pause)
@@ -145,10 +148,10 @@ def run_orientations(save_loc,circ_loc,chans,plot = True):
 		set_group = dataFile.create_group("set_" + str(setN+1))
 		for repN in range(DIRECTIONS.size):
 			##make sure you are still connected to the RZ2
-			if RZ2.get_status == 0:
+			if RZ2.get_status() != 7:
 				raise SystemError, "Hardware connection lost"
 			##create a dataset for this orientation
-			dset = set_group.create_dataset(str(DIRECTIONS[repN]), (len(chans),num_samples), dtype = 'f')
+			dset = set_group.create_dataset(str(DIRECTIONS[repN]), (max(chans),num_samples), dtype = 'f')
 			##initialize thread pool to stream data
 			#dpool = ThreadPool(processes = 3)
 			##set the contrast to zero:
@@ -156,7 +159,9 @@ def run_orientations(save_loc,circ_loc,chans,plot = True):
 			grating.draw()
 			myWin.flip()
 			##trigger the RZ2 to begin recording
+			print "Sending trigger"
 			RZ2.send_trig(1)
+
 			##start threads
 			#sort_thread = dpool.apply_async(RZ2.stream_data, ("sorted", num_samples, 16, "I32", "int"))
 			#spk_thread = dpool.apply_async(RZ2.stream_data, ("spkR", num_samples, 16, "F32", "float"))
@@ -187,8 +192,17 @@ def run_orientations(save_loc,circ_loc,chans,plot = True):
 			core.wait(GRAY_TIME)
 			##now save the data to the hdf5 file
 			#raw trace
-			trace_data = get_data(NUM_CHANNELS, num_samples, pause = .005)
+			print "getting data"
+			trace_data = get_data(chans, num_samples, pause = .005)
+			print "Data retrieved, saving data"
+			##make sure you are still connected to the RZ2
+			if RZ2.get_status() != 7:
+				raise SystemError, "Hardware connection lost"
 			dset[:,:] = trace_data
+			print "Data saved"
+			##make sure you are still connected to the RZ2
+			if RZ2.get_status() != 7:
+				raise SystemError, "Hardware connection lost"
 			if plot:
 				lfp = butter_bandpass_filter(trace_data[4,:], 0.5, 300, fs, 1)
 				spike = butter_bandpass_filter(trace_data[4,:], 300, 5000, fs, 5)
@@ -202,7 +216,6 @@ def run_orientations(save_loc,circ_loc,chans,plot = True):
 				ax4.set_ylim(lfp.min(), lfp.max())
 				fig1.suptitle(str(DIRECTIONS[repN])+" Degrees", fontsize = 18)
 				fig1.canvas.draw()
-
 	print "Orientation test complete."
 	myWin.close()
 	dataFile.close()

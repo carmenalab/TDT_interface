@@ -27,6 +27,7 @@ class RZ2:
 		self.dsp = None
 		self.fs = None
 		self.is_running = False
+		self.zBUS = None
 
 	## a function to load a circuit. Local = True loads
 	##the circuit to local memory but NOT the processor.
@@ -52,6 +53,12 @@ class RZ2:
 			if proc.Run() == 0:
 				raise SystemError, "Cannot start circuit"
 		self.dsp = proc
+
+	##to connect to the zBUS
+	def connect_zBUS(self):
+		self.zBUS = Dispatch("ZBUS.X")
+		if self.zBUS.ConnectZBUS('GB') == 0:
+			raise SystemError, "Cannot connect to zBUS"
 
 	##to start the circuit
 	def start(self):
@@ -107,9 +114,13 @@ class RZ2:
 		return result
 
 	##to send a software trigger
-	def send_trig(self, trig_num):
+	def send_trig(self, trig_num=1):
 		if self.dsp.SoftTrg(trig_num) == 0:
 			raise SystemError, "Cannot connect to hardware"
+
+	##to send a zBUS trigger (trigA)
+	def send_ztrig(self):
+		self.zBUS.zBusTrigA(0,0,5)
 
 	##to get the dataype of a target tag
 	def get_dtype(self, tag_name):
